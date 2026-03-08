@@ -49,15 +49,32 @@ pub fn init() -> anyhow::Result<()> {
             spreadsheet_id: "your_spreadsheet_id_here".into(),
             sheets: vec![
                 config::SheetConfig {
-                    category: "Category1".into(),
+                    name: "Category1".into(),
                     gid: "sheet_gid_1".into(),
                 },
                 config::SheetConfig {
-                    category: "Category2".into(),
+                    name: "Category2".into(),
                     gid: "sheet_gid_2".into(),
                 },
             ],
-        }.into(),
+        },
+        data_structure: config::DataStructureConfig {
+            sheet_field: "category".into(),
+            fields: vec![
+                config::FieldConfig {
+                    json: "id".into(),
+                    csv: "id".into(),
+                    r#type: config::FieldType::String,
+                    required: true,
+                },
+                config::FieldConfig {
+                    json: "name".into(),
+                    csv: "nombre".into(),
+                    r#type: config::FieldType::String,
+                    required: true,
+                },
+            ]
+        },
     };
 
     config::write_config(&config)?;

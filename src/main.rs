@@ -1,19 +1,19 @@
 use clap::Parser;
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
 
 mod config;
 mod cli;
 
-#[derive(Debug, Serialize, Deserialize)]
-struct Product {
-    id: String,
-    nombre: String,
-    categoria: Option<String>,
-    precio: f32,
-    descripcion: String,
-    img1: Option<String>,
-    img2: Option<String>
-}
+// #[derive(Debug, Serialize, Deserialize)]
+// struct Product {
+//     id: String,
+//     nombre: String,
+//     categoria: Option<String>,
+//     precio: f32,
+//     descripcion: String,
+//     img1: Option<String>,
+//     img2: Option<String>
+// }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,14 +27,13 @@ async fn main() -> anyhow::Result<()> {
             let config = config::read_config()?;
 
             let client = reqwest::Client::new();
-            let mut products: Vec<Product> = vec![];
+            let mut products: Vec<serde_json::Value> = vec![];
 
             for sheet in &config.spreadsheet.sheets {
                 run(
                     &client,
-                    &config.spreadsheet.spreadsheet_id, 
-                    &sheet.category,
-                    &sheet.gid,
+                    &config,
+                    &sheet,
                     &mut products
                 ).await?;
             }
@@ -65,14 +64,13 @@ async fn main() -> anyhow::Result<()> {
 
 async fn run(
     client: &reqwest::Client,
-    spreadsheet_id: &str,
-    category: &str,
-    gid: &str,
-    buffer: &mut Vec<Product>
+    config: &config::Config,
+    sheet: &config::SheetConfig,
+    buffer: &mut Vec<serde_json::Value>
 ) -> anyhow::Result<()> {
     let res = client.get(format!(
         "https://docs.google.com/spreadsheets/d/{}/export?format=csv&gid={}",
-        spreadsheet_id, gid
+        config.spreadsheet.spreadsheet_id, sheet.gid
     )).send().await?;
     
     let csv_content = res.text().await?;
@@ -81,13 +79,46 @@ async fn run(
         .delimiter(b',')
         .from_reader(csv_content.as_bytes());
 
-    // println!("{:?}", rdr.headers()?);
+    println!("{:#?}", rdr.headers()?);
 
-    for result in rdr.deserialize() {
-        let mut product: Product = result?;
-        product.categoria = Some(category.to_string());
-        // println!("{product:#?}");
-        buffer.push(product);
+    for result in rdr.deserialize::<std::collections::HashMap<String, String>>() {
+        let record = result?;
+        println!("Record: {:#?}", record);
+
+        let mut obj = serde_json::Map::new();
+
+        for field in &config.data_structure.fields {
+            match record.get(&field.csv) {
+                Some(value) => {
+                    let json_value = match field.r#type {
+                        config::FieldType::String =>
+                            serde_json::Value::String(value.clone()),
+
+                        config::FieldType::Float =>
+                            serde_json::Value::from(value.parse::<f64>()?),
+
+                        config::FieldType::Int =>
+                            serde_json::Value::from(value.parse::<i64>()?),
+
+                        config::FieldType::Bool =>
+                            serde_json::Value::from(value.parse::<bool>()?),
+                    };
+                    obj.insert(field.json.clone(), json_value);
+                },
+                None => {
+                    if field.required {
+                        anyhow::bail!("Missing required field '{}' in sheet '{}'", field.csv, sheet.name);
+                    }
+                }
+            }
+        }
+
+        obj.insert(
+            config.data_structure.sheet_field.clone(),
+            serde_json::Value::String(sheet.name.clone())
+        );
+
+        buffer.push(serde_json::Value::Object(obj));
     }
 
     Ok(())

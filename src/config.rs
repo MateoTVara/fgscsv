@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct SheetConfig {
-    pub category: String,
+    pub name: String,
     pub gid: String,
 }
 
@@ -13,10 +13,33 @@ pub struct SpreadsheetConfig {
     pub sheets: Vec<SheetConfig>,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+pub enum FieldType {
+    String,
+    Float,
+    Int,
+    Bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct FieldConfig {
+    pub json: String,
+    pub csv: String,
+    pub r#type: FieldType,
+    pub required: bool,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct DataStructureConfig {
+    pub sheet_field: String,
+    pub fields: Vec<FieldConfig>
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub output_path: String,
     pub spreadsheet: SpreadsheetConfig,
+    pub data_structure: DataStructureConfig,
 }
 
 const CONFIG_FILE: &str = "fgscsv.toml";

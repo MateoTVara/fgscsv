@@ -4,17 +4,56 @@ output_path = "tmp/products.json"
 spreadsheet_id = "1xBpQ_7aG5TW2icZ8wDI7MLI60_iNwT0oodoS2Z6Er7Y"
 
 [[spreadsheet.sheets]]
-category = "men's_clothing"
+name = "men's_clothing"
 gid = "39317466"
 
 [[spreadsheet.sheets]]
-category = "jewelery"
+name = "jewelry"
 gid = "154127679"
 
 [[spreadsheet.sheets]]
-category = "electronics"
+name = "electronics"
 gid = "92713497"
 
 [[spreadsheet.sheets]]
-category = "women's_clothing"
+name = "women's_clothing"
 gid = "1909018467"
+
+[data_structure]
+sheet_field = "category"
+
+[[data_structure.fields]]
+json = "id"
+csv = "id"
+type = "String"
+required = true
+
+[[data_structure.fields]]
+json = "name"
+csv = "nombre"
+type = "String"
+required = true
+
+[[data_structure.fields]]
+json = "price"
+csv = "precio"
+type = "Float"
+required = true
+
+[[data_structure.fields]]
+json = "description"
+csv = "descripcion"
+type = "String"
+required = true
+
+[[data_structure.fields]]
+json = "img1"
+csv = "img1"
+type = "String"
+required = false
+
+[[data_structure.fields]]
+json = "img2"
+csv = "img2"
+type = "String"
+required = false
