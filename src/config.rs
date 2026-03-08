@@ -14,6 +14,7 @@ pub struct SpreadsheetConfig {
 }
 
 #[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum FieldType {
     String,
     Float,

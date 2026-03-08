@@ -25,35 +25,35 @@ sheet_field = "category"
 [[data_structure.fields]]
 json = "id"
 csv = "id"
-type = "String"
+type = "string"
 required = true
 
 [[data_structure.fields]]
 json = "name"
 csv = "nombre"
-type = "String"
+type = "string"
 required = true
 
 [[data_structure.fields]]
 json = "price"
 csv = "precio"
-type = "Float"
+type = "float"
 required = true
 
 [[data_structure.fields]]
 json = "description"
 csv = "descripcion"
-type = "String"
+type = "string"
 required = true
 
 [[data_structure.fields]]
 json = "img1"
 csv = "img1"
-type = "String"
+type = "string"
 required = false
 
 [[data_structure.fields]]
 json = "img2"
 csv = "img2"
-type = "String"
+type = "string"
 required = false

@@ -1,19 +1,8 @@
 use clap::Parser;
-// use serde::{Deserialize, Serialize};
+use std::io::Write;
 
 mod config;
 mod cli;
-
-// #[derive(Debug, Serialize, Deserialize)]
-// struct Product {
-//     id: String,
-//     nombre: String,
-//     categoria: Option<String>,
-//     precio: f32,
-//     descripcion: String,
-//     img1: Option<String>,
-//     img2: Option<String>
-// }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -27,18 +16,8 @@ async fn main() -> anyhow::Result<()> {
             let config = config::read_config()?;
 
             let client = reqwest::Client::new();
-            let mut products: Vec<serde_json::Value> = vec![];
 
-            for sheet in &config.spreadsheet.sheets {
-                run(
-                    &client,
-                    &config,
-                    &sheet,
-                    &mut products
-                ).await?;
-            }
-
-            let output_path = output.unwrap_or(config.output_path);
+            let output_path = output.unwrap_or(config.output_path.clone());
             let output_path = std::path::PathBuf::from(output_path);
 
             if let Some(parent) = output_path.parent() {
@@ -46,7 +25,24 @@ async fn main() -> anyhow::Result<()> {
             }
 
             let f = std::fs::File::create(output_path)?;
-            serde_json::to_writer_pretty(f, &products)?;
+
+            let mut writer = std::io::BufWriter::new(f);
+
+            write!(writer, "[")?;
+
+            let mut first = true;
+            
+            for sheet in &config.spreadsheet.sheets {
+                run(
+                    &client,
+                    &config,
+                    &sheet,
+                    &mut writer,
+                    &mut first,
+                ).await?;
+            }
+
+            write!(writer, "]")?;
         },
         cli::Commands::Set { key, value } => {
             cli::set(key, value)?;
@@ -66,7 +62,8 @@ async fn run(
     client: &reqwest::Client,
     config: &config::Config,
     sheet: &config::SheetConfig,
-    buffer: &mut Vec<serde_json::Value>
+    writer: &mut impl std::io::Write,
+    first: &mut bool 
 ) -> anyhow::Result<()> {
     let res = client.get(format!(
         "https://docs.google.com/spreadsheets/d/{}/export?format=csv&gid={}",
@@ -118,7 +115,12 @@ async fn run(
             serde_json::Value::String(sheet.name.clone())
         );
 
-        buffer.push(serde_json::Value::Object(obj));
+        if !*first {
+            write!(writer, ",")?;
+        }
+
+        serde_json::to_writer(&mut *writer, &obj)?;
+        *first = false;
     }
 
     Ok(())
