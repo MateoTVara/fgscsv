@@ -1,2 +1,20 @@
 output_path = "tmp/products.json"
+
+[spreadsheet]
 spreadsheet_id = "1xBpQ_7aG5TW2icZ8wDI7MLI60_iNwT0oodoS2Z6Er7Y"
+
+[[spreadsheet.sheets]]
+category = "men's_clothing"
+gid = "39317466"
+
+[[spreadsheet.sheets]]
+category = "jewelery"
+gid = "154127679"
+
+[[spreadsheet.sheets]]
+category = "electronics"
+gid = "92713497"
+
+[[spreadsheet.sheets]]
+category = "women's_clothing"
+gid = "1909018467"

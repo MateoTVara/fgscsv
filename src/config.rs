@@ -1,10 +1,22 @@
 // src/config.rs
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize, Clone)]
+pub struct SheetConfig {
+    pub category: String,
+    pub gid: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SpreadsheetConfig {
+    pub spreadsheet_id: String,
+    pub sheets: Vec<SheetConfig>,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub output_path: String,
-    pub spreadsheet_id: String,
+    pub spreadsheet: SpreadsheetConfig,
 }
 
 const CONFIG_FILE: &str = "fgscsv.toml";

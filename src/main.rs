@@ -15,11 +15,6 @@ struct Product {
     img2: Option<String>
 }
 
-struct Sheet {
-    category: &'static str,
-    gid: &'static str,
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
@@ -28,24 +23,20 @@ async fn main() -> anyhow::Result<()> {
         cli::Commands::Init => {
             cli::init()?;
         },
-        cli::Commands::Set { key, value } => {
-            cli::set(key, value)?;
-        },
         cli::Commands::Run { output } => {
             let config = config::read_config()?;
-
-            const SHEETS: [Sheet; 4] = [
-                Sheet { category: "men's_clothing", gid: "39317466" },
-                Sheet { category: "jewelery", gid: "154127679" },
-                Sheet { category: "electronics", gid: "92713497" },
-                Sheet { category: "women's_clothing", gid: "1909018467" },
-            ];
 
             let client = reqwest::Client::new();
             let mut products: Vec<Product> = vec![];
 
-            for sheet in SHEETS {
-                run(&client, &config.spreadsheet_id, sheet.category, sheet.gid, &mut products).await?;
+            for sheet in &config.spreadsheet.sheets {
+                run(
+                    &client,
+                    &config.spreadsheet.spreadsheet_id, 
+                    &sheet.category,
+                    &sheet.gid,
+                    &mut products
+                ).await?;
             }
 
             let output_path = output.unwrap_or(config.output_path);
@@ -57,6 +48,15 @@ async fn main() -> anyhow::Result<()> {
 
             let f = std::fs::File::create(output_path)?;
             serde_json::to_writer_pretty(f, &products)?;
+        },
+        cli::Commands::Set { key, value } => {
+            cli::set(key, value)?;
+        },
+        cli::Commands::Path => {
+            cli::path()?;
+        },
+        cli::Commands::Show => {
+            cli::show()?;
         }
     }
 
