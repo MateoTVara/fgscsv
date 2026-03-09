@@ -1,4 +1,6 @@
-output_path = "tmp/products.json"
+[output]
+data_path = "tmp/output/data.json"
+media_path = "tmp/output/media"
 
 [spreadsheet]
 spreadsheet_id = "1xBpQ_7aG5TW2icZ8wDI7MLI60_iNwT0oodoS2Z6Er7Y"
@@ -51,9 +53,11 @@ json = "img1"
 csv = "img1"
 type = "string"
 required = false
+media = "image"
 
 [[data_structure.fields]]
 json = "img2"
 csv = "img2"
 type = "string"
 required = false
+media = "image"

@@ -2,6 +2,12 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
+pub struct OutputConfig {
+    pub data_path: String,
+    pub media_path: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SheetConfig {
     pub name: String,
     pub gid: String,
@@ -11,6 +17,14 @@ pub struct SheetConfig {
 pub struct SpreadsheetConfig {
     pub spreadsheet_id: String,
     pub sheets: Vec<SheetConfig>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum MediaType {
+    Image,
+    Video,
+    Other,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -28,17 +42,18 @@ pub struct FieldConfig {
     pub csv: String,
     pub r#type: FieldType,
     pub required: bool,
+    pub media: Option<MediaType>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct DataStructureConfig {
     pub sheet_field: String,
-    pub fields: Vec<FieldConfig>
+    pub fields: Vec<FieldConfig>,
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    pub output_path: String,
+    pub output: OutputConfig,
     pub spreadsheet: SpreadsheetConfig,
     pub data_structure: DataStructureConfig,
 }

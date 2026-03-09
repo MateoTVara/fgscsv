@@ -3,6 +3,7 @@ use std::io::Write;
 
 mod config;
 mod cli;
+mod media;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -17,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
 
             let client = reqwest::Client::new();
 
-            let output_path = output.unwrap_or(config.output_path.clone());
+            let output_path = output.unwrap_or(config.output.data_path.clone());
             let output_path = std::path::PathBuf::from(output_path);
 
             if let Some(parent) = output_path.parent() {

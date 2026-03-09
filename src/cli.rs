@@ -44,7 +44,10 @@ pub fn init() -> anyhow::Result<()> {
     }
 
     let config = config::Config {
-        output_path: "tmp/products.json".into(),
+        output: config::OutputConfig {
+            data_path: "tmp/output/data.json".into(),
+            media_path: "tmp/output/media".into(),
+        },
         spreadsheet: config::SpreadsheetConfig {
             spreadsheet_id: "your_spreadsheet_id_here".into(),
             sheets: vec![
@@ -66,14 +69,16 @@ pub fn init() -> anyhow::Result<()> {
                     csv: "id".into(),
                     r#type: config::FieldType::String,
                     required: true,
+                    media: None,
                 },
                 config::FieldConfig {
                     json: "name".into(),
                     csv: "nombre".into(),
                     r#type: config::FieldType::String,
                     required: true,
+                    media: None,
                 },
-            ]
+            ],
         },
     };
 
@@ -87,7 +92,7 @@ pub fn set(key: ConfigKey, value: String) -> anyhow::Result<()> {
     let mut config = config::read_config()?;
 
     match key {
-        ConfigKey::Output => config.output_path = value,
+        ConfigKey::Output => config.output.data_path = value,
         ConfigKey::SpreadsheetId => config.spreadsheet.spreadsheet_id = value,
     }
 
