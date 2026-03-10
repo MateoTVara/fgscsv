@@ -6,7 +6,7 @@ media_path = "tmp/output/media"
 spreadsheet_id = "1xBpQ_7aG5TW2icZ8wDI7MLI60_iNwT0oodoS2Z6Er7Y"
 
 [[spreadsheet.sheets]]
-name = "men's_clothing"
+name = "men_clothing"
 gid = "39317466"
 
 [[spreadsheet.sheets]]
@@ -18,13 +18,14 @@ name = "electronics"
 gid = "92713497"
 
 [[spreadsheet.sheets]]
-name = "women's_clothing"
+name = "women_clothing"
 gid = "1909018467"
 
 [data_structure]
 sheet_field = "category"
 
 [[data_structure.fields]]
+is_identifier = true
 json = "id"
 csv = "id"
 type = "string"

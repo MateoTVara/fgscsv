@@ -38,6 +38,7 @@ pub enum FieldType {
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct FieldConfig {
+    pub is_identifier: Option<bool>,
     pub json: String,
     pub csv: String,
     pub r#type: FieldType,

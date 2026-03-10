@@ -1,6 +1,5 @@
-use std::io::{BufRead, BufReader, Write};
-
 // src/cli.rs
+use std::io::{BufRead, BufReader, Write};
 use crate::config;
 
 #[derive(clap::ValueEnum, Clone)]
@@ -65,6 +64,7 @@ pub fn init() -> anyhow::Result<()> {
             sheet_field: "category".into(),
             fields: vec![
                 config::FieldConfig {
+                    is_identifier: Some(true),
                     json: "id".into(),
                     csv: "id".into(),
                     r#type: config::FieldType::String,
@@ -72,6 +72,7 @@ pub fn init() -> anyhow::Result<()> {
                     media: None,
                 },
                 config::FieldConfig {
+                    is_identifier: None,
                     json: "name".into(),
                     csv: "nombre".into(),
                     r#type: config::FieldType::String,

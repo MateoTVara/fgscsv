@@ -15,24 +15,21 @@ async fn main() -> anyhow::Result<()> {
         },
         cli::Commands::Run { output } => {
             let config = config::read_config()?;
-
             let client = reqwest::Client::new();
 
             let output_path = output.unwrap_or(config.output.data_path.clone());
             let output_path = std::path::PathBuf::from(output_path);
-
             if let Some(parent) = output_path.parent() {
                 std::fs::create_dir_all(parent)?;
             }
 
-            let f = std::fs::File::create(output_path)?;
+            std::fs::create_dir_all(&config.output.media_path)?;
 
+            let f = std::fs::File::create(output_path)?;
             let mut writer = std::io::BufWriter::new(f);
 
-            write!(writer, "[")?;
-
             let mut first = true;
-            
+            write!(writer, "[")?;            
             for sheet in &config.spreadsheet.sheets {
                 run(
                     &client,
@@ -42,7 +39,6 @@ async fn main() -> anyhow::Result<()> {
                     &mut first,
                 ).await?;
             }
-
             write!(writer, "]")?;
         },
         cli::Commands::Set { key, value } => {
@@ -82,10 +78,58 @@ async fn run(
     for result in rdr.deserialize::<std::collections::HashMap<String, String>>() {
         let record = result?;
         println!("Record: {:#?}", record);
-
         let mut obj = serde_json::Map::new();
 
+        // Identify the record using the identifier field
+        let mut identifier: Option<String> = None;
         for field in &config.data_structure.fields {
+            if field.is_identifier.unwrap_or(false) {
+                identifier = record.get(&field.csv).cloned();
+                break;
+            }
+        }
+        let id = identifier
+            .ok_or_else(|| anyhow::anyhow!("Missing identifier field"))?;
+
+        let mut image_index = 1; // To handle multiple media fields(images) in the same record
+
+        for field in &config.data_structure.fields {
+
+            // Handle media fields
+            if let Some(media) = &field.media {
+                if let Some(url) = record.get(&field.csv) {
+                    let path = media::make_media_path(
+                        &config.output.media_path,
+                        &sheet.name,
+                        &id,
+                        media,
+                        image_index,
+                        url
+                    );
+                    image_index += 1;
+
+                    if let Some(parent) = path.parent() {
+                        std::fs::create_dir_all(parent)?;
+                    }
+
+                    match media {
+                        config::MediaType::Image => {
+                            media::download_image(client, url, &path).await?;
+                        },
+                        _ => {}
+                    }
+
+                    obj.insert(
+                        field.json.clone(),
+                        serde_json::Value::String(
+                            path.to_string_lossy().to_string()
+                        ),
+                    );
+                }
+                continue;
+            }
+
+            // Handle regular fields
             match record.get(&field.csv) {
                 Some(value) => {
                     let json_value = match field.r#type {
@@ -111,15 +155,14 @@ async fn run(
             }
         }
 
+        // Add sheet name to the object
         obj.insert(
             config.data_structure.sheet_field.clone(),
             serde_json::Value::String(sheet.name.clone())
         );
 
-        if !*first {
-            write!(writer, ",")?;
-        }
-
+        // Write the object to the output JSON file
+        if !*first { write!(writer, ",")? }
         serde_json::to_writer(&mut *writer, &obj)?;
         *first = false;
     }
