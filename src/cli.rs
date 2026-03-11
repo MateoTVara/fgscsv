@@ -61,7 +61,7 @@ pub fn init() -> anyhow::Result<()> {
             ],
         },
         data_structure: config::DataStructureConfig {
-            sheet_field: "category".into(),
+            sheet_field: Some(String::from("category")),
             fields: vec![
                 config::FieldConfig {
                     is_identifier: Some(true),

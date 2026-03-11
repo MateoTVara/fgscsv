@@ -48,7 +48,7 @@ pub struct FieldConfig {
 
 #[derive(Serialize, Deserialize)]
 pub struct DataStructureConfig {
-    pub sheet_field: String,
+    pub sheet_field: Option<String>,
     pub fields: Vec<FieldConfig>,
 }
 

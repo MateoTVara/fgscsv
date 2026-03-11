@@ -156,10 +156,9 @@ async fn run(
         }
 
         // Add sheet name to the object
-        obj.insert(
-            config.data_structure.sheet_field.clone(),
-            serde_json::Value::String(sheet.name.clone())
-        );
+        if let Some(sheet_field) = config.data_structure.sheet_field.clone() {
+            obj.insert(sheet_field, serde_json::Value::String(sheet.name.clone()));
+        }
 
         // Write the object to the output JSON file
         if !*first { write!(writer, ",")? }
