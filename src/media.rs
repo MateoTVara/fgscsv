@@ -41,7 +41,7 @@ pub fn make_media_path(
     sheet: &str,
     id: &str,
     media_type: &crate::config::MediaType,
-    index: usize,
+    index: i32,
     url: &str,
 ) -> std::path::PathBuf {
     let ext = url

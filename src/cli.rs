@@ -1,6 +1,6 @@
 // src/cli.rs
 use std::io::{BufRead, BufReader, Write};
-use crate::config;
+use crate::{config, pipeline};
 
 #[derive(clap::ValueEnum, Clone)]
 pub enum ConfigKey {
@@ -85,6 +85,39 @@ pub fn init() -> anyhow::Result<()> {
 
     config::write_config(&config)?;
     println!("Created fgscsv.toml");
+
+    Ok(())
+}
+
+pub async fn run(
+    output: Option<String>
+) -> anyhow::Result<()> {
+    let config = config::read_config()?;
+    let client = reqwest::Client::new();
+
+    let output_path = output.unwrap_or(config.output.data_path.clone());
+    let output_path = std::path::PathBuf::from(output_path);
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
+    std::fs::create_dir_all(&config.output.media_path)?;
+
+    let f = std::fs::File::create(output_path)?;
+    let mut writer = std::io::BufWriter::new(f);
+
+    let mut first = true;
+    write!(writer, "[")?;            
+    for sheet in &config.spreadsheet.sheets {
+        pipeline::run(
+            &client,
+            &config,
+            &sheet,
+            &mut writer,
+            &mut first,
+        ).await?;
+    }
+    write!(writer, "]")?;
 
     Ok(())
 }

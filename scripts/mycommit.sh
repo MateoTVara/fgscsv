@@ -14,7 +14,7 @@ git log > "$TMP_DIR/commits.log"
 
 echo "Generating directory structure to $TMP_DIR/tree.log..."
 echo "$(basename "$PROJECT_ROOT")" > "$TMP_DIR/tree.log"
-tree -a --dirsfirst -I 'node_modules|.git|.venv' \
+tree -a --dirsfirst -I 'node_modules|.git|.venv|target|tmp' \
   | sed '1d' >> "$TMP_DIR/tree.log"
 
 echo "All information has been saved to $PROJECT_ROOT/$TMP_DIR."
