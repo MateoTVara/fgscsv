@@ -92,38 +92,38 @@ async fn run(
             .ok_or_else(|| anyhow::anyhow!("Missing identifier field"))?;
 
         let mut image_index = 1; // To handle multiple media fields(images) in the same record
+        let mut video_index = 1; // To handle multiple media fields(videos) in the same record
 
         for field in &config.data_structure.fields {
 
             // Handle media fields
             if let Some(media) = &field.media {
                 if let Some(url) = record.get(&field.csv) {
+                    if url.is_empty() { continue }
+
+                    let index = match media {
+                        config::MediaType::Image => { let i = image_index; image_index += 1; i },
+                        config::MediaType::Video => { let i = video_index; video_index += 1; i },
+                        _ => 0,
+                    };
+
                     let path = media::make_media_path(
                         &config.output.media_path,
-                        &sheet.name,
-                        &id,
-                        media,
-                        image_index,
-                        url
+                        &sheet.name, &id, media, index, url
                     );
-                    image_index += 1;
-
                     if let Some(parent) = path.parent() {
                         std::fs::create_dir_all(parent)?;
                     }
 
                     match media {
-                        config::MediaType::Image => {
-                            media::download_image(client, url, &path).await?;
-                        },
+                        config::MediaType::Image => media::download_image(client, url, &path).await?,
+                        config::MediaType::Video => media::download_video(url, &path)?,
                         _ => {}
                     }
 
                     obj.insert(
                         field.json.clone(),
-                        serde_json::Value::String(
-                            path.to_string_lossy().to_string()
-                        ),
+                        serde_json::Value::String(path.to_string_lossy().to_string()),
                     );
                 }
                 continue;

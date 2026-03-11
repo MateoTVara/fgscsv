@@ -62,3 +62,10 @@ csv = "img2"
 type = "string"
 required = false
 media = "image"
+
+[[data_structure.fields]]
+json = "vid1"
+csv = "vid1"
+type = "string"
+required = false
+media = "video"

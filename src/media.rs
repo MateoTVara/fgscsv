@@ -20,6 +20,22 @@ pub async fn download_image(
     Ok(())
 }
 
+pub fn download_video(
+    url: &str,
+    output_path: &std::path::PathBuf,
+) -> anyhow::Result<()> {
+    let status = std::process::Command::new("yt-dlp")
+        .arg("--no-playlist")
+        .arg("-o")
+        .arg(format!("{}.%(ext)s", output_path.display()))
+        .arg(url)
+        .status()?;
+
+    if !status.success() { anyhow::bail!("yt-dlp failed") }
+
+    Ok(())
+}
+
 pub fn make_media_path(
     output_dir: &str,
     sheet: &str,
