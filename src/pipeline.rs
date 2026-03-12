@@ -90,8 +90,8 @@ async fn process_media_field(
     field: &config::FieldConfig,
     media: &config::MediaType,
     id: &str,
-    obj: &mut serde_json::Map<String, serde_json::Value>,
     index: &mut i32,
+    list: &mut Vec<serde_json::Value>
 ) -> anyhow::Result<()> {
     let Some(url) = record.get(&field.csv) else { return Ok(()); };
     if url.is_empty() { return Ok(()); }
@@ -113,7 +113,9 @@ async fn process_media_field(
 
     *index += 1;
 
-    obj.insert(field.json.clone(), serde_json::Value::String(path.to_string_lossy().to_string()));
+    list.push(serde_json::Value::String(path.to_string_lossy().to_string()));
+
+    // obj.insert(field.json.clone(), serde_json::Value::String(path.to_string_lossy().to_string()));
 
     Ok(())
 }
@@ -174,22 +176,34 @@ async fn process_record (
     let mut video_index = 1; // To handle multiple media fields(videos) in the same record
     let mut other_index = 1;
 
+    let mut images = vec![];
+    let mut videos = vec![];
+    let mut others = vec![];
+
     for field in &config.data_structure.fields {
         // Handle media fields
         if let Some(media) = &field.media {
             process_media_field(
                 client, config, sheet, &record,
-                &field, media, &id, &mut obj,
+                &field, media, &id,
                 match media {
                     config::MediaType::Image => &mut image_index,
                     config::MediaType::Video => &mut video_index,
                     config::MediaType::Other => &mut other_index
+                },
+                match media {
+                    config::MediaType::Image => &mut images,
+                    config::MediaType::Video => &mut videos,
+                    config::MediaType::Other => &mut others,
                 },
             ).await?;
         } else { // Handle regular fields
             process_regular_field(&record, field, sheet, &mut obj)?;
         }
     }
+
+    obj.insert("images".to_string(), serde_json::Value::Array(images));
+    obj.insert("videos".to_string(), serde_json::Value::Array(videos));
 
     // Add sheet name to the object
     add_sheet_field(&config, &sheet, &mut obj);
