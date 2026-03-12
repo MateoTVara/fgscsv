@@ -88,26 +88,17 @@ async fn process_media_field(
     sheet: &config::SheetConfig,
     record: &std::collections::HashMap<String, String>,
     field: &config::FieldConfig,
+    media: &config::MediaType,
     id: &str,
     obj: &mut serde_json::Map<String, serde_json::Value>,
-    image_index: &mut i32,
-    video_index: &mut i32,
+    index: &mut i32,
 ) -> anyhow::Result<()> {
-
-    let Some(media) = &field.media else { return Ok(()); };
-
     let Some(url) = record.get(&field.csv) else { return Ok(()); };
     if url.is_empty() { return Ok(()); }
 
-    let index = match media {
-        config::MediaType::Image => { let i = *image_index; *image_index += 1; i }
-        config::MediaType::Video => { let i = *video_index; *video_index += 1; i }
-        _ => 0,
-    };
-
     let path = media::make_media_path(
         &config.output.media_path,
-        &sheet.name, id, media, index, url,
+        &sheet.name, id, media, *index, url,
     );
 
     if let Some(parent) = path.parent() {
@@ -119,6 +110,8 @@ async fn process_media_field(
         config::MediaType::Video => media::download_video(url, &path)?,
         _ => {}
     }
+
+    *index += 1;
 
     obj.insert(field.json.clone(), serde_json::Value::String(path.to_string_lossy().to_string()));
 
@@ -179,16 +172,19 @@ async fn process_record (
 
     let mut image_index = 1; // To handle multiple media fields(images) in the same record
     let mut video_index = 1; // To handle multiple media fields(videos) in the same record
+    let mut other_index = 1;
 
     for field in &config.data_structure.fields {
         // Handle media fields
-        if let Some(_) = &field.media {
+        if let Some(media) = &field.media {
             process_media_field(
-                client, config, sheet,
-                &record, field, &id,
-                &mut obj,
-                &mut image_index,
-                &mut video_index
+                client, config, sheet, &record,
+                &field, media, &id, &mut obj,
+                match media {
+                    config::MediaType::Image => &mut image_index,
+                    config::MediaType::Video => &mut video_index,
+                    config::MediaType::Other => &mut other_index
+                },
             ).await?;
         } else { // Handle regular fields
             process_regular_field(&record, field, sheet, &mut obj)?;
