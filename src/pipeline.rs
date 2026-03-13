@@ -1,22 +1,25 @@
 // src/pipeline.rs
-use crate::{config, media};
+use crate::{config, media, cli};
 
 pub async fn run(
     client: &reqwest::Client,
     config: &config::Config,
     sheet: &config::SheetConfig,
     writer: &mut impl std::io::Write,
-    first: &mut bool 
+    first: &mut bool,
+    state: &mut cli::State,
+    seen: &mut std::collections::HashSet<String>,
 ) -> anyhow::Result<()> {
     let csv_content = fetch_csv(client, config, sheet).await?;
     let mut rdr = create_csv_reader(&csv_content);
-
     println!("{:#?}", rdr.headers()?);
 
     for result in rdr.deserialize::<std::collections::HashMap<String, String>>() {
         let record = result?;
         
-        let obj = process_record(&record, config, client, sheet).await?;
+        let obj = process_record(
+            &record, config, client, sheet, state, seen
+        ).await?;
 
         // Write the object to the output JSON file
         write_json_object(first, writer, &obj)?;
@@ -44,20 +47,6 @@ fn create_csv_reader(csv_content: &str) -> csv::Reader<&[u8]> {
     csv::ReaderBuilder::new()
         .delimiter(b',')
         .from_reader(csv_content.as_bytes())
-}
-
-fn extract_identifier(
-    record: &std::collections::HashMap<String, String>,
-    config: &config::Config
-) -> anyhow::Result<String> {
-    for field in &config.data_structure.fields {
-        if field.is_identifier.unwrap_or(false) {
-            if let Some(id) = record.get(&field.csv) {
-                return Ok(id.clone());
-            }
-        }
-    }
-    anyhow::bail!("Missing identifier field")
 }
 
 fn add_sheet_field(
@@ -115,8 +104,6 @@ async fn process_media_field(
 
     list.push(serde_json::Value::String(path.to_string_lossy().to_string()));
 
-    // obj.insert(field.json.clone(), serde_json::Value::String(path.to_string_lossy().to_string()));
-
     Ok(())
 }
 
@@ -164,13 +151,23 @@ async fn process_record (
     record: &std::collections::HashMap<String, String>,
     config: &config::Config,
     client: &reqwest::Client,
-    sheet: &config::SheetConfig
+    sheet: &config::SheetConfig,
+    state: &mut cli::State,
+    seen: &mut std::collections::HashSet<String>,
 ) -> anyhow::Result<serde_json::Map<String, serde_json::Value>> {
-    println!("Record: {:#?}", record);
+    // println!("Record: {:#?}", record);
     let mut obj = serde_json::Map::new();
 
     // Identify the record using the identifier field
     let id = extract_identifier(&record, config)?;
+    seen.insert(id.clone());
+
+    let prev = state.get(&id);
+    let is_new = prev.is_none();
+
+    if is_new {
+        println!("NEW entry: {}", id);
+    }
 
     let mut image_index = 1; // To handle multiple media fields(images) in the same record
     let mut video_index = 1; // To handle multiple media fields(videos) in the same record
@@ -180,27 +177,48 @@ async fn process_record (
     let mut videos = vec![];
     let mut others = vec![];
 
+    let mut changed = false;
+
     for field in &config.data_structure.fields {
+        let field_changed = prev
+            .map(|p| p.get(&field.csv) != record.get(&field.csv))
+            .unwrap_or(true);
+
+        if field_changed && !is_new {
+            println!("Field '{}' changed for '{}'", field.csv, id);
+        }
+
+        changed |= field_changed;
+
         // Handle media fields
         if let Some(media) = &field.media {
-            process_media_field(
-                client, config, sheet, &record,
-                &field, media, &id,
-                match media {
-                    config::MediaType::Image => &mut image_index,
-                    config::MediaType::Video => &mut video_index,
-                    config::MediaType::Other => &mut other_index
-                },
-                match media {
-                    config::MediaType::Image => &mut images,
-                    config::MediaType::Video => &mut videos,
-                    config::MediaType::Other => &mut others,
-                },
-            ).await?;
+            if field_changed {
+                println!("Media field '{}' changed for '{}'", field.csv, id);
+                process_media_field(
+                    client, config, sheet, &record,
+                    &field, media, &id,
+                    match media {
+                        config::MediaType::Image => &mut image_index,
+                        config::MediaType::Video => &mut video_index,
+                        config::MediaType::Other => &mut other_index
+                    },
+                    match media {
+                        config::MediaType::Image => &mut images,
+                        config::MediaType::Video => &mut videos,
+                        config::MediaType::Other => &mut others,
+                    },
+                ).await?;
+            }
         } else { // Handle regular fields
             process_regular_field(&record, field, sheet, &mut obj)?;
         }
     }
+
+    if !is_new && !changed {
+        println!("UNCHANGED entry: {}", id);
+    }
+
+    state.insert(id.clone(), record.clone());
 
     obj.insert("images".to_string(), serde_json::Value::Array(images));
     obj.insert("videos".to_string(), serde_json::Value::Array(videos));
@@ -209,4 +227,18 @@ async fn process_record (
     add_sheet_field(&config, &sheet, &mut obj);
 
     Ok(obj)
+}
+
+fn extract_identifier(
+    record: &std::collections::HashMap<String, String>,
+    config: &config::Config
+) -> anyhow::Result<String> {
+    for field in &config.data_structure.fields {
+        if field.is_identifier.unwrap_or(false) {
+            if let Some(id) = record.get(&field.csv) {
+                return Ok(id.clone());
+            }
+        }
+    }
+    anyhow::bail!("Missing identifier field")
 }

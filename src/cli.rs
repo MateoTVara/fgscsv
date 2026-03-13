@@ -2,6 +2,8 @@
 use std::io::{BufRead, BufReader, Write};
 use crate::{config, pipeline};
 
+pub type State = std::collections::HashMap<String, std::collections::HashMap<String, String>>;
+
 #[derive(clap::ValueEnum, Clone)]
 pub enum ConfigKey {
     Output,
@@ -97,27 +99,54 @@ pub async fn run(
 
     let output_path = output.unwrap_or(config.output.data_path.clone());
     let output_path = std::path::PathBuf::from(output_path);
-    if let Some(parent) = output_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
 
     std::fs::create_dir_all(&config.output.media_path)?;
 
-    let f = std::fs::File::create(output_path)?;
-    let mut writer = std::io::BufWriter::new(f);
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent)?;
 
-    let mut first = true;
-    write!(writer, "[")?;            
-    for sheet in &config.spreadsheet.sheets {
-        pipeline::run(
-            &client,
-            &config,
-            &sheet,
-            &mut writer,
-            &mut first,
-        ).await?;
+        let f = std::fs::File::create(&output_path)?;
+        let mut writer = std::io::BufWriter::new(f);
+
+        let state_path = parent.join(".fgscsv_state.json");
+        let state_f = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .open(&state_path)?;
+        let state_rd = BufReader::new(state_f);
+        let state: State = serde_json::from_reader(state_rd).unwrap_or_default();
+        let mut state = state;
+
+        println!("Resuming from state: {:#?}", state);
+
+        let mut first = true;
+
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+        write!(writer, "[")?;
+        for sheet in &config.spreadsheet.sheets {
+            pipeline::run(
+                &client,
+                &config,
+                &sheet,
+                &mut writer,
+                &mut first,
+                &mut state,
+                &mut seen,
+            ).await?;
+        }
+        write!(writer, "]")?;
+
+        for id in state.keys().cloned().collect::<Vec<_>>() {
+            if !seen.contains(&id) {
+                println!("Record '{}' deleted", id);
+                state.remove(&id);
+            }
+        }
+
+        let state_file = std::fs::File::create(&state_path)?;
+        serde_json::to_writer_pretty(state_file, &state)?;
     }
-    write!(writer, "]")?;
 
     Ok(())
 }
