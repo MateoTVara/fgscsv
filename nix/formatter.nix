@@ -2,11 +2,13 @@
   treefmt,
   nixfmt,
   rustfmt,
+  keep-sorted,
 }:
 treefmt.withConfig {
   runtimeInputs = [
     nixfmt
     rustfmt
+    keep-sorted
   ];
 
   settings = {
@@ -19,7 +21,15 @@ treefmt.withConfig {
       };
       rustfmt = {
         command = "rustfmt";
+        options = [
+          "--edition"
+          "2024"
+        ];
         includes = [ "*.rs" ];
+      };
+      keep-sorted = {
+        command = "keep-sorted";
+        includes = [ "*" ];
       };
     };
   };

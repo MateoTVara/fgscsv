@@ -17,8 +17,10 @@
         default = fgscsv;
       };
 
-      devShells.${system} = pkgs.callPackage ./nix/shell.nix { };
+      devShells.${system}.default = pkgs.callPackage ./nix/shell.nix { };
 
       formatter.${system} = pkgs.callPackage ./nix/formatter.nix { };
+
+      checks.${system} = self.packages.${system};
     };
 }

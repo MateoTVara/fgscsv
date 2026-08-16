@@ -9,5 +9,5 @@ rustPlatform.buildRustPackage {
   src = ../.;
 
   # cargoHash = lib.fakeHash;
-  cargoHash = "sha256-roCYIIhD3tjU/IAGSiWCIJ5wdSJJgqId9ET4iMlqsgY=";
+  cargoHash = "sha256-hZpMfrM/3evCjKWVyx9EleKlvsVdSOKg2vacSLhOlRI=";
 }
