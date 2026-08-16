@@ -1,5 +1,4 @@
 // keep-sorted start
-
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -222,6 +221,26 @@ enum FieldType {
     Bool,
 }
 
+impl FieldType {
+    fn parse(&self, value: &str) -> Result<FieldValue, Box<dyn std::error::Error + Send + Sync>> {
+        let val = match self {
+            Self::String => FieldValue::String(value.to_owned()),
+            Self::Int => FieldValue::Int(value.parse()?),
+            Self::Float => FieldValue::Float(value.parse()?),
+            Self::Bool => {
+                let boolean_val = match value.to_lowercase().as_str() {
+                    "true" => true,
+                    "false" => false,
+                    _ => return Err(format!("invalid bool value {value}").into()),
+                };
+                FieldValue::Bool(boolean_val)
+            }
+        };
+
+        Ok(val)
+    }
+}
+
 #[derive(Debug)]
 enum FieldValue {
     String(String),
@@ -280,18 +299,7 @@ fn deserialize_record(
                 );
             }
         } else {
-            Some(match field.ty {
-                FieldType::String => FieldValue::String(unproccesed_record_val.to_owned()),
-                FieldType::Int => FieldValue::Int(unproccesed_record_val.parse::<u32>()?),
-                FieldType::Float => FieldValue::Float(unproccesed_record_val.parse::<f64>()?),
-                FieldType::Bool => {
-                    FieldValue::Bool(match unproccesed_record_val.to_lowercase().as_str() {
-                        "true" => true,
-                        "false" => false,
-                        _ => return Err("".into()),
-                    })
-                }
-            })
+            Some(field.ty.parse(unproccesed_record_val)?)
         };
 
         if let Some(new_name) = field.rename {
@@ -323,20 +331,6 @@ fn deserialize_field(dsl_command: &str) -> Result<Field, Box<dyn std::error::Err
         }
         None => false,
     };
-
-    // let rename = if rest.is_empty() {
-    //     None
-    // } else if let Some(after_arrow) = rest.strip_prefix(" -> ") {
-    //     let end_index = after_arrow.find(' ').unwrap_or(after_arrow.len());
-    //     let new_name = &after_arrow[..end_index];
-    //     if new_name.is_empty() {
-    //         return Err("Expected identifier after ` -> `".into());
-    //     }
-    //     rest = &after_arrow[end_index..];
-    //     Some(new_name.to_owned())
-    // } else {
-    //     return Err(format!("unexpected input `{rest}`",).into());
-    // };
 
     let rename = if let Some(after_arrow) = rest.strip_prefix(" -> ") {
         let end_index = after_arrow.find(' ').unwrap_or(after_arrow.len());
