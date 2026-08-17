@@ -36,15 +36,29 @@ pub async fn run_cli() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
         let schema = dsl::parse_schema(raw_schema)?;
 
-        handles.push(tokio::spawn(pipeline::process_sheet(
-            config.root_path.clone(),
-            sheet_id.clone(),
-            schema,
-        )));
+        handles.push((
+            sheet.schema.clone(),
+            tokio::spawn(pipeline::process_sheet(
+                config.root_path.clone(),
+                sheet_id.clone(),
+                schema,
+            )),
+        ));
     }
 
-    for handle in handles {
-        handle.await??;
+    let mut records_per_schema = HashMap::new();
+
+    for (schema_name, handle) in handles {
+        let records = handle.await??;
+
+        records_per_schema
+            .entry(schema_name)
+            .or_insert_with(Vec::new)
+            .extend(records);
+    }
+
+    for (schema_name, records) in records_per_schema {
+        pipeline::write_schema_data(&schema_name, &records).await?;
     }
 
     Ok(())

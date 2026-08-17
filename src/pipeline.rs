@@ -7,11 +7,10 @@ pub async fn process_sheet(
     root_path: String,
     sheet_id: String,
     schema: dsl::Schema,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<HashMap<String, Option<dsl::FieldValue>>>, Box<dyn std::error::Error + Send + Sync>>
+{
     let sheet_content = fetch_sheet(&root_path, &sheet_id).await?;
-    let serialized = process_sheet_content(&sheet_content, schema)?;
-    write_sheet_data(&sheet_id, &serialized).await?;
-    Ok(())
+    process_sheet_content(&sheet_content, schema)
 }
 
 async fn fetch_sheet(
@@ -27,7 +26,8 @@ async fn fetch_sheet(
 fn process_sheet_content(
     sheet_content: &str,
     schema: dsl::Schema,
-) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+) -> Result<Vec<HashMap<String, Option<dsl::FieldValue>>>, Box<dyn std::error::Error + Send + Sync>>
+{
     let mut rdr = csv::Reader::from_reader(sheet_content.as_bytes());
     let mut records: Vec<HashMap<String, Option<dsl::FieldValue>>> = Vec::new();
 
@@ -36,16 +36,18 @@ fn process_sheet_content(
         let record = deserialize_record(record, &schema)?;
         records.push(record);
     }
-    let serialized = serde_json::to_string_pretty(&records)?;
-    println!("{}", serialized);
-    Ok(serialized)
+    // let serialized = serde_json::to_string_pretty(&records)?;
+    // println!("{}", serialized);
+    // Ok(serialized)
+    Ok(records)
 }
 
-async fn write_sheet_data(
-    sheet_id: &str,
-    sheet_data: &str,
+pub async fn write_schema_data(
+    schema_name: &str,
+    records: &[HashMap<String, Option<dsl::FieldValue>>],
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    tokio::fs::write(format!("data_{sheet_id}.json"), sheet_data).await?;
+    let serialized = serde_json::to_string_pretty(records)?;
+    tokio::fs::write(format!("data_{schema_name}.json"), serialized).await?;
     Ok(())
 }
 
