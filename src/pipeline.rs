@@ -36,9 +36,7 @@ fn process_sheet_content(
         let record = deserialize_record(record, &schema)?;
         records.push(record);
     }
-    // let serialized = serde_json::to_string_pretty(&records)?;
-    // println!("{}", serialized);
-    // Ok(serialized)
+
     Ok(records)
 }
 
@@ -79,4 +77,180 @@ pub fn deserialize_record(
     }
 
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dsl::{Field, FieldType, FieldValue, Schema};
+
+    // Helper to build a schema from a map for testing
+    fn build_schema(fields: Vec<(&str, Field)>) -> Schema {
+        let mut map = HashMap::new();
+        for (name, field) in fields {
+            map.insert(name.to_string(), field);
+        }
+        Schema { fields: map }
+    }
+
+    #[test]
+    fn deserialize_record_ok() {
+        let schema = build_schema(vec![
+            (
+                "id",
+                Field {
+                    ty: FieldType::String,
+                    nullable: false,
+                    rename: None,
+                    meta: None,
+                },
+            ),
+            (
+                "price",
+                Field {
+                    ty: FieldType::Float,
+                    nullable: true,
+                    rename: Some("cost".to_string()),
+                    meta: None,
+                },
+            ),
+        ]);
+
+        let mut record = HashMap::new();
+        record.insert("id".to_string(), "abc".to_string());
+        record.insert("price".to_string(), "12.5".to_string());
+
+        let result = deserialize_record(record, &schema).unwrap();
+        assert_eq!(result.len(), 2);
+        assert_eq!(
+            result.get("id").unwrap(),
+            &Some(FieldValue::String("abc".to_string()))
+        );
+        assert_eq!(result.get("cost").unwrap(), &Some(FieldValue::Float(12.5)));
+    }
+
+    #[test]
+    fn deserialize_record_nullable_empty() {
+        let schema = build_schema(vec![(
+            "qty",
+            Field {
+                ty: FieldType::Int,
+                nullable: true,
+                rename: None,
+                meta: None,
+            },
+        )]);
+
+        let mut record = HashMap::new();
+        record.insert("qty".to_string(), "".to_string());
+
+        let result = deserialize_record(record, &schema).unwrap();
+        assert_eq!(result.get("qty").unwrap(), &None);
+    }
+
+    #[test]
+    fn deserialize_record_non_nullable_empty_error() {
+        let schema = build_schema(vec![(
+            "qty",
+            Field {
+                ty: FieldType::Int,
+                nullable: false,
+                rename: None,
+                meta: None,
+            },
+        )]);
+
+        let mut record = HashMap::new();
+        record.insert("qty".to_string(), "".to_string());
+
+        let err = deserialize_record(record, &schema).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("not nullable") && msg.contains("empty value"));
+    }
+
+    #[test]
+    fn deserialize_record_missing_key_error() {
+        let schema = build_schema(vec![(
+            "id",
+            Field {
+                ty: FieldType::String,
+                nullable: false,
+                rename: None,
+                meta: None,
+            },
+        )]);
+
+        let record = HashMap::new(); // no "id" key
+
+        let err = deserialize_record(record, &schema).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("unexpected key `id`"));
+    }
+
+    #[test]
+    fn process_sheet_content_ok() {
+        let schema = build_schema(vec![
+            (
+                "name",
+                Field {
+                    ty: FieldType::String,
+                    nullable: false,
+                    rename: None,
+                    meta: None,
+                },
+            ),
+            (
+                "age",
+                Field {
+                    ty: FieldType::Int,
+                    nullable: true,
+                    rename: None,
+                    meta: None,
+                },
+            ),
+        ]);
+
+        let csv_data = "name,age\nAlice,30\nBob,\nCharlie,25";
+        let result = process_sheet_content(csv_data, schema).unwrap();
+
+        assert_eq!(result.len(), 3);
+        // First record
+        let r0 = &result[0];
+        assert_eq!(
+            r0.get("name").unwrap(),
+            &Some(FieldValue::String("Alice".to_string()))
+        );
+        assert_eq!(r0.get("age").unwrap(), &Some(FieldValue::Int(30)));
+        // Second record with empty age -> None
+        let r1 = &result[1];
+        assert_eq!(
+            r1.get("name").unwrap(),
+            &Some(FieldValue::String("Bob".to_string()))
+        );
+        assert_eq!(r1.get("age").unwrap(), &None);
+        // Third
+        let r2 = &result[2];
+        assert_eq!(
+            r2.get("name").unwrap(),
+            &Some(FieldValue::String("Charlie".to_string()))
+        );
+        assert_eq!(r2.get("age").unwrap(), &Some(FieldValue::Int(25)));
+    }
+
+    #[test]
+    fn process_sheet_content_error_on_invalid_type() {
+        let schema = build_schema(vec![(
+            "age",
+            Field {
+                ty: FieldType::Int,
+                nullable: false,
+                rename: None,
+                meta: None,
+            },
+        )]);
+
+        let csv_data = "age\nnot_a_number";
+        let result = process_sheet_content(csv_data, schema);
+        assert!(result.is_err());
+    }
 }

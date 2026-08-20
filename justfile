@@ -1,6 +1,6 @@
 alias r := run
 alias b := build
-alias f := fmt
+alias t := test
 
 default: run
 
@@ -10,8 +10,12 @@ run subcommand="run":
 build:
     cargo build
 
+test:
+    cargo test
+
 alias nb := nix-build
 alias nc := nix-check
+alias f := fmt
 
 [group('nix')]
 nix-build:

@@ -3,6 +3,7 @@ use serde::Serialize;
 use std::collections::HashMap;
 // keep-sorted end
 
+#[derive(Default)]
 pub struct Schema {
     pub fields: HashMap<String, Field>,
 }
@@ -46,7 +47,7 @@ impl FieldType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FieldValue {
     String(String),
     Int(u32),
@@ -68,7 +69,7 @@ impl Serialize for FieldValue {
     }
 }
 
-enum FieldMeta {
+pub enum FieldMeta {
     Identifier,
     Media(FieldMetaMedia),
 }
@@ -169,4 +170,114 @@ fn strip_some_prefix<'a>(
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_field_basic() {
+        let field = parse_field("string").unwrap();
+        assert!(matches!(field.ty, FieldType::String));
+        assert!(!field.nullable);
+        assert_eq!(field.rename, None);
+        assert!(field.meta.is_none());
+
+        let field = parse_field("int? -> count @identifier").unwrap();
+        assert!(matches!(field.ty, FieldType::Int));
+        assert!(field.nullable);
+        assert_eq!(field.rename, Some("count".to_owned()));
+        assert!(matches!(field.meta, Some(FieldMeta::Identifier)));
+    }
+
+    #[test]
+    fn parse_field_media() {
+        let field = parse_field("string? @media(image)").unwrap();
+        assert!(matches!(field.ty, FieldType::String));
+        assert!(field.nullable);
+        assert!(field.rename.is_none());
+        let meta = field.meta.unwrap();
+        match meta {
+            FieldMeta::Media(media) => assert!(matches!(media, FieldMetaMedia::Image)),
+            _ => panic!("expected Media"),
+        }
+    }
+
+    #[test]
+    fn parse_field_errors() {
+        assert!(parse_field("unknown").is_err());
+        assert!(parse_field("int -> ").is_err()); // empty rename
+        assert!(parse_field("string @unknown").is_err());
+        assert!(parse_field("string @media(unknown)").is_err());
+        assert!(parse_field("bool? extra").is_err()); // unexpected trailing
+    }
+
+    #[test]
+    fn strip_some_prefix_works() {
+        let input = "string? -> name";
+        let (prefix, rest) =
+            strip_some_prefix(input, vec!["string", "int", "float", "bool"]).unwrap();
+        assert_eq!(prefix, "string");
+        assert_eq!(rest, "? -> name");
+
+        let input = "float";
+        let (prefix, rest) =
+            strip_some_prefix(input, vec!["string", "int", "float", "bool"]).unwrap();
+        assert_eq!(prefix, "float");
+        assert_eq!(rest, "");
+
+        let input = "unknown";
+        assert!(strip_some_prefix(input, vec!["string", "int", "float", "bool"]).is_none());
+    }
+
+    #[test]
+    fn field_type_parse() {
+        let ty = FieldType::String;
+        assert!(matches!(ty.parse("hello").unwrap(), FieldValue::String(s) if s == "hello"));
+
+        let ty = FieldType::Int;
+        assert!(matches!(ty.parse("42").unwrap(), FieldValue::Int(42)));
+        assert!(ty.parse("foo").is_err());
+
+        let ty = FieldType::Float;
+        assert!(
+            matches!(ty.parse("3.14").unwrap(), FieldValue::Float(v) if (v - 3.14).abs() < 1e-9)
+        );
+        assert!(ty.parse("abc").is_err());
+
+        let ty = FieldType::Bool;
+        assert!(matches!(ty.parse("true").unwrap(), FieldValue::Bool(true)));
+        assert!(matches!(
+            ty.parse("false").unwrap(),
+            FieldValue::Bool(false)
+        ));
+        assert!(matches!(ty.parse("True").unwrap(), FieldValue::Bool(true)));
+        assert!(ty.parse("1").is_err());
+    }
+
+    #[test]
+    fn parse_schema_ok() {
+        let mut raw = RawSchema::new();
+        raw.insert("id".to_string(), "string @identifier".to_string());
+        raw.insert("name".to_string(), "string".to_string());
+        raw.insert("qty".to_string(), "int? -> count".to_string());
+
+        let schema = parse_schema(&raw).unwrap();
+        assert_eq!(schema.fields.len(), 3);
+        let id_field = schema.fields.get("id").unwrap();
+        assert!(matches!(id_field.ty, FieldType::String));
+        assert!(matches!(id_field.meta, Some(FieldMeta::Identifier)));
+        let qty_field = schema.fields.get("qty").unwrap();
+        assert!(matches!(qty_field.ty, FieldType::Int));
+        assert_eq!(qty_field.rename, Some("count".to_string()));
+        assert!(qty_field.nullable);
+    }
+
+    #[test]
+    fn parse_schema_error() {
+        let mut raw = RawSchema::new();
+        raw.insert("bad".to_string(), "unknown".to_string());
+        assert!(parse_schema(&raw).is_err());
+    }
 }
