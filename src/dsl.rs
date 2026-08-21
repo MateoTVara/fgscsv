@@ -3,13 +3,14 @@ use serde::Serialize;
 use std::collections::HashMap;
 // keep-sorted end
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Schema {
     pub fields: HashMap<String, Field>,
 }
 
 pub type RawSchema = HashMap<String, String>;
 
+#[derive(Debug)]
 pub struct Field {
     pub ty: FieldType,
     pub nullable: bool,
@@ -17,6 +18,7 @@ pub struct Field {
     pub meta: Option<FieldMeta>,
 }
 
+#[derive(Debug)]
 pub enum FieldType {
     String,
     Int,
@@ -69,12 +71,14 @@ impl Serialize for FieldValue {
     }
 }
 
+#[derive(PartialEq, Debug)]
 pub enum FieldMeta {
     Identifier,
     Media(FieldMetaMedia),
 }
 
-enum FieldMetaMedia {
+#[derive(PartialEq, Debug)]
+pub enum FieldMetaMedia {
     Image,
     Video,
 }
@@ -85,7 +89,14 @@ pub fn parse_schema(
     let fields = schema
         .iter()
         .map(|(name, dsl)| parse_field(dsl).map(|field| (name.clone(), field)))
-        .collect::<Result<_, _>>()?;
+        .collect::<Result<HashMap<String, Field>, _>>()?;
+
+    if !fields
+        .values()
+        .any(|field| field.meta == Some(FieldMeta::Identifier))
+    {
+        return Err("no field has been marked as an identifier".into());
+    }
 
     Ok(Schema { fields })
 }
@@ -279,5 +290,17 @@ mod tests {
         let mut raw = RawSchema::new();
         raw.insert("bad".to_string(), "unknown".to_string());
         assert!(parse_schema(&raw).is_err());
+    }
+
+    #[test]
+    fn parse_schema_no_identifier() {
+        let mut raw = RawSchema::new();
+        raw.insert("name".into(), "string".into());
+        raw.insert("qty".into(), "int -> count".into());
+        let err = parse_schema(&raw).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("no field has been marked as an identifier")
+        )
     }
 }
