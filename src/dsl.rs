@@ -18,7 +18,7 @@ pub struct Field {
     pub meta: Option<FieldMeta>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FieldType {
     String,
     Int,
@@ -144,6 +144,12 @@ fn parse_field(dsl_command: &str) -> Result<Field, Box<dyn std::error::Error + S
         if rest == "@identifier" {
             Some(FieldMeta::Identifier)
         } else if let Some(media) = rest.strip_prefix("@media(") {
+            if ty != FieldType::String {
+                return Err(
+                    "expected field type `String` for media metadata, found `{ty:?}`".into(),
+                );
+            }
+
             let media = media
                 .strip_suffix(')')
                 .ok_or("expected `)` after media type")?;
@@ -213,6 +219,16 @@ mod tests {
             FieldMeta::Media(media) => assert!(matches!(media, FieldMetaMedia::Image)),
             _ => panic!("expected Media"),
         }
+    }
+
+    #[test]
+    fn parse_field_media_err() {
+        let field_err = parse_field("int @media(image)").unwrap_err();
+        let err_msg = field_err.to_string();
+        assert_eq!(
+            err_msg,
+            "expected field type `String` for media metadata, found `{ty:?}`".to_string()
+        );
     }
 
     #[test]
