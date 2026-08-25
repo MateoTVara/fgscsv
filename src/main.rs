@@ -15,5 +15,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         cli::Commands::Init => cli::init_cli()?,
     };
 
+    // let hash1 = blake3::hash(b"content");
+    // println!("{hash1}\n");
+
     Ok(())
 }

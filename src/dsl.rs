@@ -6,6 +6,7 @@ use std::collections::HashMap;
 #[derive(Default, Debug)]
 pub struct Schema {
     pub fields: HashMap<String, Field>,
+    pub identifier: String,
 }
 
 pub type RawSchema = HashMap<String, String>;
@@ -91,14 +92,15 @@ pub fn parse_schema(
         .map(|(name, dsl)| parse_field(dsl).map(|field| (name.clone(), field)))
         .collect::<Result<HashMap<String, Field>, _>>()?;
 
-    if !fields
-        .values()
-        .any(|field| field.meta == Some(FieldMeta::Identifier))
+    let identifier = match fields
+        .iter()
+        .find(|(_name, field)| field.meta == Some(FieldMeta::Identifier))
     {
-        return Err("no field has been marked as an identifier".into());
-    }
+        Some((name, field)) => field.rename.clone().unwrap_or(name.clone()),
+        None => return Err("no field has been marked as an identifier".into()),
+    };
 
-    Ok(Schema { fields })
+    Ok(Schema { identifier, fields })
 }
 
 fn parse_field(dsl_command: &str) -> Result<Field, Box<dyn std::error::Error + Send + Sync>> {

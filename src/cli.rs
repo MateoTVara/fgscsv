@@ -47,19 +47,53 @@ pub async fn run_cli() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     let mut records_per_schema = HashMap::new();
+    let mut new_state_per_schema = HashMap::new();
 
     for (schema_name, handle) in handles {
-        let records = handle.await??;
+        let sheet = handle.await??;
 
         records_per_schema
-            .entry(schema_name)
+            .entry(schema_name.clone())
             .or_insert_with(Vec::new)
-            .extend(records);
+            .extend(sheet.records);
+
+        new_state_per_schema
+            .entry(schema_name.clone())
+            .or_insert_with(HashMap::new)
+            .extend(sheet.state);
+    }
+
+    for (schema_name, new_state) in &new_state_per_schema {
+        let current_state = pipeline::get_current_state(schema_name.clone())?;
+        let states = pipeline::get_record_states(&current_state, new_state);
+
+        for (record_id, state) in states {
+            match state {
+                pipeline::RecordState::Added { hash } => {
+                    println!("{record_id} was added: {hash}");
+                }
+
+                pipeline::RecordState::Updated { old_hash, new_hash } => {
+                    println!("{record_id} was updated");
+                    println!("  old: {old_hash}");
+                    println!("  new: {new_hash}");
+                }
+
+                pipeline::RecordState::Deleted { hash } => {
+                    println!("{record_id} was deleted: {hash}");
+                }
+            }
+        }
     }
 
     for (schema_name, records) in records_per_schema {
         pipeline::write_schema_data(&schema_name, &records).await?;
     }
+
+    let state_path = std::path::Path::new(".fgscsv/state.json");
+    fs::create_dir_all(".fgscsv")?;
+    let file = fs::File::create(state_path)?;
+    serde_json::to_writer_pretty(file, &new_state_per_schema)?;
 
     Ok(())
 }
