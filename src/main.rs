@@ -1,22 +1,26 @@
 // keep-sorted start
-mod cli;
-mod config;
-mod dsl;
-mod pipeline;
 use clap::Parser;
+use fgscsv::{
+    app,
+    cli::{Cli, Commands},
+};
+use std::process::ExitCode;
 // keep-sorted end
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let cli = cli::Cli::parse();
+async fn main() -> ExitCode {
+    let cli = Cli::parse();
 
-    match cli.command {
-        cli::Commands::Run => cli::run_cli().await?,
-        cli::Commands::Init => cli::init_cli()?,
+    let result = match cli.command {
+        Commands::Run => app::run().await,
+        Commands::Init => app::init(),
     };
 
-    // let hash1 = blake3::hash(b"content");
-    // println!("{hash1}\n");
-
-    Ok(())
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            eprintln!("error: {err}");
+            ExitCode::FAILURE
+        }
+    }
 }
